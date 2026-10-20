@@ -28,6 +28,36 @@ export async function GET() {
   }
 }
 
+export async function PATCH(request: Request) {
+  let update: { id?: unknown; completed?: unknown };
+
+  try {
+    update = await request.json();
+  } catch {
+    return Response.json({ error: "Le corps de la requête doit être un JSON valide." }, { status: 400 });
+  }
+
+  if (!Number.isInteger(update?.id) || typeof update.completed !== "boolean") {
+    return Response.json({ error: "Un identifiant et un statut completed valide sont requis." }, { status: 400 });
+  }
+
+  try {
+    const data = await readTasks();
+    const task = data.tasks.find((item) => item.id === update.id);
+
+    if (!task) {
+      return Response.json({ error: "Tâche introuvable." }, { status: 404 });
+    }
+
+    task.completed = update.completed;
+    await writeFile(tasksFilePath, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
+
+    return Response.json(task);
+  } catch {
+    return Response.json({ error: "Impossible d’enregistrer la tâche." }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   let newTask: Omit<Task, "id">;
 

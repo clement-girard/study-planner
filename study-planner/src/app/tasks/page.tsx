@@ -27,6 +27,7 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatingIds, setUpdatingIds] = useState<number[]>([]);
 
   useEffect(() => {
     async function loadTasks() {
@@ -44,6 +45,35 @@ export default function TasksPage() {
 
     void loadTasks();
   }, []);
+
+  async function updateCompletion(task: Task, completed: boolean) {
+    setError(null);
+    setUpdatingIds((ids) => [...ids, task.id]);
+
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: task.id, completed }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error ?? "Impossible de mettre à jour la tâche.");
+      }
+      const updatedTask: Task = await response.json();
+      setTasks((currentTasks) =>
+        currentTasks.map((item) => (item.id === updatedTask.id ? updatedTask : item)),
+      );
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Impossible de mettre à jour la tâche.",
+      );
+    } finally {
+      setUpdatingIds((ids) => ids.filter((id) => id !== task.id));
+    }
+  }
 
   const completedCount = tasks.filter((task) => task.completed).length;
 
@@ -97,16 +127,14 @@ export default function TasksPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <span
-                      aria-label={task.completed ? "Terminée" : "À terminer"}
-                      className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-                        task.completed
-                          ? "border-emerald-500 bg-emerald-500 text-white"
-                          : "border-slate-300 text-transparent"
-                      }`}
-                    >
-                      ✓
-                    </span>
+                    <input
+                      type="checkbox"
+                      checked={task.completed}
+                      disabled={updatingIds.includes(task.id)}
+                      onChange={(event) => void updateCompletion(task, event.target.checked)}
+                      aria-label={`Marquer « ${task.title} » comme terminée`}
+                      className="mt-1 h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 text-emerald-600 accent-emerald-600 focus:ring-2 focus:ring-emerald-500 disabled:cursor-wait"
+                    />
                     <div>
                       <h2 className={`font-semibold leading-6 ${task.completed ? "text-slate-400 line-through" : "text-slate-900"}`}>
                         {task.title}
